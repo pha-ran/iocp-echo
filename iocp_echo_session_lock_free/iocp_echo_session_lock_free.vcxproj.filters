@@ -26,5 +26,8 @@
     <ClInclude Include="ring_buffer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="session.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -34,8 +34,6 @@ bool lan_server::start(
 	_session_size = 0;
 	_sessions = new session[_session_max];
 
-	// todo
-
 	// iocp
 	_iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, number_of_concurrent);
 
@@ -172,7 +170,71 @@ unsigned __stdcall lan_server::accept_worker(void* args)
 	int addr_len = sizeof(client_addr);
 	unsigned long long session_id = 1;
 
-	// todo
+	for (;;)
+	{
+		// accept
+		SOCKET client_socket = accept(_this->_listen_socket, (SOCKADDR*)&client_addr, &addr_len);
+
+		if (client_socket == INVALID_SOCKET)
+		{
+			int error = WSAGetLastError();
+
+			if (error == WSAEINTR) break;
+			else if (error == WSAENOTSOCK) break;
+			else __debugbreak();
+		}
+
+		// session
+		session* sessions = _this->_sessions;
+		unsigned short session_max = _this->_session_max;
+
+		int index;
+		session* current = nullptr;
+
+		for (index = 0; index < session_max; ++index)
+		{
+			if (sessions[index]._key._all == -1)
+			{
+				current = &(sessions[index]);
+				break;
+			}
+		}
+
+		if (index >= session_max) __debugbreak();
+
+		current->_socket = client_socket;
+
+		current->_key._id = session_id;
+		current->_key._index = index;
+
+		current->_io_count = 0;
+		current->_io_send = 0;
+
+		PCWSTR ntop = InetNtopW(AF_INET, &client_addr.sin_addr, current->_ip, _countof(current->_ip));
+		current->_port = ntohs(client_addr.sin_port);
+
+		if (ntop == NULL)
+		{
+			int error = WSAGetLastError();
+			__debugbreak();
+		}
+
+		current->_recv_buffer.clear();
+		current->_send_buffer.clear();
+
+		// iocp
+		HANDLE iocp_ret = CreateIoCompletionPort((HANDLE)client_socket, _this->_iocp, (ULONG_PTR)current, 0);
+
+		if (iocp_ret == NULL)
+		{
+			wprintf(L"%d\n", GetLastError());
+			__debugbreak();
+		}
+
+		++session_id;
+
+		// todo
+	}
 
 	wprintf(L"[return] accept %d\n", GetCurrentThreadId());
 

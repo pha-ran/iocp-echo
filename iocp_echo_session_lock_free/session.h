@@ -14,12 +14,6 @@ private:
 	{
 		_key._all = -1;
 		_ip[0] = L'\0';
-		InitializeCriticalSection(&_cs);
-	}
-
-	inline ~session(void) noexcept
-	{
-		DeleteCriticalSection(&_cs);
 	}
 
 private:
@@ -40,8 +34,6 @@ private:
 
 	unsigned short _port;
 	WCHAR _ip[16];
-
-	CRITICAL_SECTION _cs;
 
 	WSAOVERLAPPED _recv_overlapped;
 	WSAOVERLAPPED _send_overlapped;

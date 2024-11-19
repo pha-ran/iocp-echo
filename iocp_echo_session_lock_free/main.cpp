@@ -20,7 +20,7 @@ int wmain(void)
 
 	echo _echo;
 
-	_echo.start(L"0.0.0.0", 20000, 10000, 8, 0);
+	_echo.start(L"0.0.0.0", 6000, 10000, 8, 0);
 
 	// loop
 	for (;;)

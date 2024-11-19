@@ -1,6 +1,12 @@
 #include "lan_server.h"
 #include <conio.h>
 
+#ifdef _DEBUG
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
+#endif
+
 class echo : public lan_server
 {
 	;
@@ -8,6 +14,10 @@ class echo : public lan_server
 
 int wmain(void)
 {
+#ifdef _DEBUG
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
+
 	echo _echo;
 
 	_echo.start(L"0.0.0.0", 20000, 10000, 8, 0);

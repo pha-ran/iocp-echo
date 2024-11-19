@@ -5,7 +5,7 @@
 
 class session final
 {
-	friend class session_manager;
+	friend class lan_server;
 
 private:
 #pragma warning(suppress:26495)

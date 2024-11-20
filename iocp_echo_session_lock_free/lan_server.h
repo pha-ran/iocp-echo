@@ -12,18 +12,18 @@ public:
 	bool start(
 		const wchar_t* ip, unsigned short port, unsigned int session_max,
 		unsigned short worker_count, unsigned short number_of_concurrent
-	);
+	) noexcept;
 
-	void stop(void);
+	void stop(void) noexcept;
 
-public:
-	static unsigned __stdcall accept_worker(void* args);
-	static unsigned __stdcall iocp_worker(void* args);
+private:
+	static unsigned __stdcall accept_worker(void* args) noexcept;
+	static unsigned __stdcall iocp_worker(void* args) noexcept;
 
 private:
 	session* _sessions;
 	unsigned short _session_max;
-	unsigned short _session_size;
+	unsigned short _session_count;
 
 	HANDLE* _threads;
 	unsigned short _thread_max;

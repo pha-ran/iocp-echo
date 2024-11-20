@@ -27,11 +27,11 @@ lan_server::~lan_server(void) noexcept
 bool lan_server::start(
 	const wchar_t* ip, unsigned short port, unsigned int session_max,
 	unsigned short worker_count, unsigned short number_of_concurrent
-)
+) noexcept
 {
 	// session
 	_session_max = session_max;
-	_session_size = 0;
+	_session_count = 0;
 	_sessions = new session[_session_max];
 
 	// iocp
@@ -136,7 +136,7 @@ bool lan_server::start(
 	return true;
 }
 
-void lan_server::stop(void)
+void lan_server::stop(void) noexcept
 {
 	closesocket(_listen_socket);
 
@@ -163,7 +163,7 @@ void lan_server::stop(void)
 	delete[] _sessions;
 }
 
-unsigned __stdcall lan_server::accept_worker(void* args)
+unsigned __stdcall lan_server::accept_worker(void* args) noexcept
 {
 	lan_server* _this = (lan_server*)args;
 	SOCKADDR_IN client_addr;
@@ -232,6 +232,7 @@ unsigned __stdcall lan_server::accept_worker(void* args)
 		}
 
 		++session_id;
+		++(_this->_session_count);
 
 		// todo
 	}
@@ -241,12 +242,76 @@ unsigned __stdcall lan_server::accept_worker(void* args)
 	return 0;
 }
 
-unsigned __stdcall lan_server::iocp_worker(void* args)
+unsigned __stdcall lan_server::iocp_worker(void* args) noexcept
 {
 	lan_server* _this = (lan_server*)args;
 	int thread_id = GetCurrentThreadId();
 
-	// todo
+	for (;;)
+	{
+		DWORD transferred;
+		session* s;
+		OVERLAPPED* ptr;
+
+		int gqcs_ret = GetQueuedCompletionStatus(_this->_iocp, &transferred, (PULONG_PTR)&s, &ptr, INFINITE);
+
+		if (transferred == 0)
+		{
+			wprintf(
+				L"[GQCS EXIT] %d : gqcs_ret %d / t %d / s %p / p %p\n",
+				thread_id, gqcs_ret, transferred, s, ptr
+			);
+
+			if (s == 0 && ptr == 0) break;
+		}
+		else if (&s->_recv_overlapped == ptr)
+		{
+			wprintf(
+				L"[GQCS RECV] %d : gqcs_ret %d / t %d / s %p / p %p / io %d\n",
+				thread_id, gqcs_ret, transferred, s, ptr, s->_io_count
+			);
+
+			s->_recv_buffer.move_back(transferred);
+
+			for (;;)
+			{
+				unsigned short header;
+				unsigned long long payload;
+
+				if (s->_recv_buffer.use_size() < sizeof(header)) break;
+
+				s->_recv_buffer.peek((char*)&header, sizeof(header));
+
+				if (s->_recv_buffer.use_size() < header + sizeof(header)) break;
+
+				s->_recv_buffer.move_front(sizeof(header));
+
+				s->_recv_buffer.dequeue((char*)&payload, header);
+
+				// todo
+			}
+
+			// todo
+		}
+		else
+		{
+			wprintf(
+				L"[GQCS SEND] %d : gqcs_ret %d / t %d / s %p / p %p / io %d\n",
+				thread_id, gqcs_ret, transferred, s, ptr, s->_io_count
+			);
+
+			s->_send_buffer.move_front(transferred);
+
+			InterlockedExchange8(&s->_io_send, 0);
+
+			// todo
+		}
+
+#pragma warning(suppress:6011)
+		int io_count = InterlockedDecrement(&s->_io_count);
+
+		if (io_count == 0); // todo
+	}
 
 	wprintf(L"[return] iocp %d\n", thread_id);
 

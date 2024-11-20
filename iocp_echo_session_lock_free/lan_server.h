@@ -26,7 +26,10 @@ public:
 	bool send_message(unsigned long long key, unsigned long long payload) noexcept;
 
 public:
-	virtual void on_receive(unsigned long long key, unsigned long long payload) = 0;
+	virtual void on_receive(unsigned long long key, unsigned long long payload) noexcept = 0;
+
+private:
+	long recv_post(session* s) noexcept;
 
 private:
 	static unsigned __stdcall accept_worker(void* args) noexcept;

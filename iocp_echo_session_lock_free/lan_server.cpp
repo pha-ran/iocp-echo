@@ -184,6 +184,44 @@ bool lan_server::send_message(unsigned long long key, unsigned long long payload
 	return false;
 }
 
+long lan_server::recv_post(session* s) noexcept
+{
+	InterlockedIncrement(&s->_io_count);
+
+	WSABUF wb[2];
+	DWORD flags = 0;
+
+	int count = s->_recv_buffer.set_wsabuf_recv(wb);
+
+	if (wb[0].len <= 0) __debugbreak();
+
+	memset(&s->_recv_overlapped, 0, sizeof(s->_recv_overlapped));
+
+	int recv_ret = WSARecv(s->_socket, wb, count, NULL, &flags, &s->_recv_overlapped, NULL);
+
+	if (recv_ret == SOCKET_ERROR)
+	{
+		int error = WSAGetLastError();
+
+		if (error != WSA_IO_PENDING)
+		{
+			wprintf(L"WSARecv error %d\n", error);
+
+			if (error == WSAECONNABORTED || error == WSAECONNRESET)
+			{
+				int io_count = InterlockedDecrement(&s->_io_count);
+
+				return io_count;
+			}
+			else __debugbreak();
+		}
+
+		wprintf(L"[WSARecv] PENDING %d (io %d)\n", error, s->_io_count);
+	}
+
+	return wb[0].len;
+}
+
 unsigned __stdcall lan_server::accept_worker(void* args) noexcept
 {
 	lan_server* _this = (lan_server*)args;
@@ -255,7 +293,9 @@ unsigned __stdcall lan_server::accept_worker(void* args) noexcept
 		++session_id;
 		++(_this->_session_count);
 
-		// todo
+		long recv_ret = _this->recv_post(current);
+
+		if (recv_ret == 0); // todo
 	}
 
 	wprintf(L"[return] accept %d\n", GetCurrentThreadId());
@@ -309,10 +349,12 @@ unsigned __stdcall lan_server::iocp_worker(void* args) noexcept
 
 				s->_recv_buffer.dequeue((char*)&payload, header);
 
+				wprintf(L"%d\n", payload);
+
 				// todo
 			}
 
-			// todo
+			_this->recv_post(s);
 		}
 		else
 		{

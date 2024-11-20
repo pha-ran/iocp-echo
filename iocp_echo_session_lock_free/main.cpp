@@ -9,7 +9,10 @@
 
 class echo : public lan_server
 {
-	;
+	void on_receive(unsigned long long key, unsigned long long payload) override
+	{
+		send_message(key, payload);
+	}
 };
 
 int wmain(void) noexcept

@@ -16,6 +16,18 @@ public:
 
 	void stop(void) noexcept;
 
+public:
+	inline unsigned short session_count(void) const noexcept
+	{
+		return _session_count;
+	}
+
+public:
+	bool send_message(unsigned long long key, unsigned long long payload) noexcept;
+
+public:
+	virtual void on_receive(unsigned long long key, unsigned long long payload) = 0;
+
 private:
 	static unsigned __stdcall accept_worker(void* args) noexcept;
 	static unsigned __stdcall iocp_worker(void* args) noexcept;

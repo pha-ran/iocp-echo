@@ -163,6 +163,27 @@ void lan_server::stop(void) noexcept
 	delete[] _sessions;
 }
 
+bool lan_server::send_message(unsigned long long key, unsigned long long payload) noexcept
+{
+	session* s = &_sessions[((session::key*)&key)->_index];
+
+	if (s->_key._id != ((session::key*)&key)->_id) __debugbreak(); // todo
+
+	unsigned short header = sizeof(payload);
+
+	int header_ret = s->_send_buffer.enqueue((char*)&header, sizeof(header));
+
+	if (header_ret <= 0) __debugbreak();
+
+	int payload_ret = s->_send_buffer.enqueue((char*)&payload, sizeof(payload));
+
+	if (payload_ret <= 0) __debugbreak();
+	
+	// todo
+
+	return false;
+}
+
 unsigned __stdcall lan_server::accept_worker(void* args) noexcept
 {
 	lan_server* _this = (lan_server*)args;

@@ -19,7 +19,7 @@ private:
 private:
 	SOCKET _socket;
 	
-	union KEY
+	union key
 	{
 		unsigned long long _all;
 		struct

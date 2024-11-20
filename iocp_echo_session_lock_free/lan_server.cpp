@@ -179,7 +179,7 @@ bool lan_server::send_message(unsigned long long key, unsigned long long payload
 
 	if (payload_ret <= 0) __debugbreak();
 	
-	// todo
+	send_post(s);
 
 	return false;
 }
@@ -205,7 +205,7 @@ long lan_server::recv_post(session* s) noexcept
 
 		if (error != WSA_IO_PENDING)
 		{
-			wprintf(L"WSARecv error %d\n", error);
+			//wprintf(L"WSARecv error %d\n", error);
 
 			if (error == WSAECONNABORTED || error == WSAECONNRESET)
 			{
@@ -216,10 +216,58 @@ long lan_server::recv_post(session* s) noexcept
 			else __debugbreak();
 		}
 
-		wprintf(L"[WSARecv] PENDING %d (io %d)\n", error, s->_io_count);
+		//wprintf(L"[WSARecv] PENDING %d (io %d)\n", error, s->_io_count);
 	}
 
 	return wb[0].len;
+}
+
+void lan_server::send_post(session* s) noexcept
+{
+	int use_size = s->_send_buffer.use_size();
+
+	if (use_size <= 0) return;
+
+	char prev_io_send = InterlockedExchange8(&s->_io_send, 1);
+
+	if (prev_io_send) return;
+
+	WSABUF wb[2];
+
+	int count = s->_send_buffer.set_wsabuf_send(wb);
+
+	if (wb[0].len <= 0)
+	{
+		InterlockedExchange8(&s->_io_send, 0);
+		return;
+	}
+
+	InterlockedIncrement(&s->_io_count);
+
+	memset(&s->_send_overlapped, 0, sizeof(s->_send_overlapped));
+
+	int send_ret = WSASend(s->_socket, wb, count, NULL, 0, &s->_send_overlapped, NULL);
+
+	if (send_ret == SOCKET_ERROR)
+	{
+		int error = WSAGetLastError();
+
+		if (error != WSA_IO_PENDING)
+		{
+			//wprintf(L"WSASend error %d\n", error);
+
+			if (error == WSAECONNABORTED || error == WSAECONNRESET)
+			{
+				InterlockedDecrement(&s->_io_count);
+				InterlockedExchange8(&s->_io_send, 0);
+
+				return;
+			}
+			else __debugbreak();
+		}
+
+		//wprintf(L"[WSASend] PENDING %d (io %d)\n", error, s->_io_count);
+	}
 }
 
 unsigned __stdcall lan_server::accept_worker(void* args) noexcept
@@ -286,7 +334,7 @@ unsigned __stdcall lan_server::accept_worker(void* args) noexcept
 
 		if (iocp_ret == NULL)
 		{
-			wprintf(L"%d\n", GetLastError());
+			int error = GetLastError();
 			__debugbreak();
 		}
 
@@ -318,19 +366,19 @@ unsigned __stdcall lan_server::iocp_worker(void* args) noexcept
 
 		if (transferred == 0)
 		{
-			wprintf(
+			/*wprintf(
 				L"[GQCS EXIT] %d : gqcs_ret %d / t %d / s %p / p %p\n",
 				thread_id, gqcs_ret, transferred, s, ptr
-			);
+			);*/
 
 			if (s == 0 && ptr == 0) break;
 		}
 		else if (&s->_recv_overlapped == ptr)
 		{
-			wprintf(
+			/*wprintf(
 				L"[GQCS RECV] %d : gqcs_ret %d / t %d / s %p / p %p / io %d\n",
 				thread_id, gqcs_ret, transferred, s, ptr, s->_io_count
-			);
+			);*/
 
 			s->_recv_buffer.move_back(transferred);
 
@@ -349,25 +397,23 @@ unsigned __stdcall lan_server::iocp_worker(void* args) noexcept
 
 				s->_recv_buffer.dequeue((char*)&payload, header);
 
-				wprintf(L"%d\n", payload);
-
-				// todo
+				_this->on_receive(s->_key._all, payload);
 			}
 
 			_this->recv_post(s);
 		}
 		else
 		{
-			wprintf(
+			/*wprintf(
 				L"[GQCS SEND] %d : gqcs_ret %d / t %d / s %p / p %p / io %d\n",
 				thread_id, gqcs_ret, transferred, s, ptr, s->_io_count
-			);
+			);*/
 
 			s->_send_buffer.move_front(transferred);
 
 			InterlockedExchange8(&s->_io_send, 0);
 
-			// todo
+			_this->send_post(s);
 		}
 
 #pragma warning(suppress:6011)

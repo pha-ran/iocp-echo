@@ -140,7 +140,11 @@ void lan_server::stop(void) noexcept
 {
 	closesocket(_listen_socket);
 
-	// todo
+	for (int i = 0; i < _session_max; ++i)
+		delete_session(&_sessions[i]);
+
+	for (int i = 0; i < _session_max; ++i)
+		if (_sessions[i]._socket != INVALID_SOCKET) __debugbreak();
 
 	for (int i = 1; i < _thread_max; ++i)
 		PostQueuedCompletionStatus(_iocp, 0, 0, 0);
@@ -184,7 +188,7 @@ bool lan_server::send_message(unsigned long long key, unsigned long long payload
 	return true;
 }
 
-long lan_server::recv_post(session* s) noexcept
+void lan_server::recv_post(session* s) noexcept
 {
 	InterlockedIncrement(&s->_io_count);
 
@@ -207,30 +211,26 @@ long lan_server::recv_post(session* s) noexcept
 		{
 			//wprintf(L"WSARecv error %d\n", error);
 
-			if (error == WSAECONNABORTED || error == WSAECONNRESET)
-			{
-				long io_count = InterlockedDecrement(&s->_io_count);
-
-				return io_count;
-			}
+			if (error == WSAENOTSOCK ||
+				error == WSAECONNABORTED ||
+				error == WSAECONNRESET)
+				InterlockedDecrement(&s->_io_count);
 			else __debugbreak();
 		}
 
 		//wprintf(L"[WSARecv] PENDING %d (io %d)\n", error, s->_io_count);
 	}
-
-	return wb[0].len;
 }
 
-long lan_server::send_post(session* s) noexcept
+void lan_server::send_post(session* s) noexcept
 {
 	int use_size = s->_send_buffer.use_size();
 
-	if (use_size <= 0) return -1;
+	if (use_size <= 0) return;
 
 	char prev_io_send = InterlockedExchange8(&s->_io_send, 1);
 
-	if (prev_io_send) return -1;
+	if (prev_io_send) return;
 
 	WSABUF wb[2];
 
@@ -239,7 +239,7 @@ long lan_server::send_post(session* s) noexcept
 	if (wb[0].len <= 0)
 	{
 		InterlockedExchange8(&s->_io_send, 0);
-		return -1;
+		return;
 	}
 
 	InterlockedIncrement(&s->_io_count);
@@ -256,20 +256,18 @@ long lan_server::send_post(session* s) noexcept
 		{
 			//wprintf(L"WSASend error %d\n", error);
 
-			if (error == WSAECONNABORTED || error == WSAECONNRESET)
+			if (error == WSAENOTSOCK ||
+				error == WSAECONNABORTED ||
+				error == WSAECONNRESET)
 			{
 				InterlockedExchange8(&s->_io_send, 0);
-				long io_count = InterlockedDecrement(&s->_io_count);
-
-				return io_count;
+				InterlockedDecrement(&s->_io_count);
 			}
 			else __debugbreak();
 		}
 
 		//wprintf(L"[WSASend] PENDING %d (io %d)\n", error, s->_io_count);
 	}
-
-	return wb[0].len;
 }
 
 void lan_server::delete_session(session* s) noexcept
@@ -361,10 +359,10 @@ unsigned __stdcall lan_server::accept_worker(void* args) noexcept
 		if (payload_ret <= 0) __debugbreak();
 		
 		// send
-		long send_ret = _this->send_post(current);
+		_this->send_post(current);
 
 		// recv
-		if (send_ret != 0) _this->recv_post(current);
+		_this->recv_post(current);
 
 		// io count
 		long io_count = InterlockedDecrement(&current->_io_count);
@@ -443,7 +441,7 @@ unsigned __stdcall lan_server::iocp_worker(void* args) noexcept
 		}
 
 #pragma warning(suppress:6011)
-		int io_count = InterlockedDecrement(&s->_io_count);
+		long io_count = InterlockedDecrement(&s->_io_count);
 
 		if (io_count == 0) _this->delete_session(s);
 	}

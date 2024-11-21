@@ -29,8 +29,8 @@ public:
 	virtual void on_receive(unsigned long long key, unsigned long long payload) noexcept = 0;
 
 private:
-	long recv_post(session* s) noexcept;
-	long send_post(session* s) noexcept;
+	void recv_post(session* s) noexcept;
+	void send_post(session* s) noexcept;
 	void delete_session(session* s) noexcept;
 
 private:

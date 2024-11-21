@@ -167,7 +167,7 @@ bool lan_server::send_message(unsigned long long key, unsigned long long payload
 {
 	session* s = &_sessions[((session::key*)&key)->_index];
 
-	if (s->_key._id != ((session::key*)&key)->_id) __debugbreak(); // todo
+	// todo
 
 	unsigned short header = sizeof(payload);
 
@@ -181,7 +181,7 @@ bool lan_server::send_message(unsigned long long key, unsigned long long payload
 	
 	send_post(s);
 
-	return false;
+	return true;
 }
 
 long lan_server::recv_post(session* s) noexcept
@@ -209,7 +209,7 @@ long lan_server::recv_post(session* s) noexcept
 
 			if (error == WSAECONNABORTED || error == WSAECONNRESET)
 			{
-				int io_count = InterlockedDecrement(&s->_io_count);
+				long io_count = InterlockedDecrement(&s->_io_count);
 
 				return io_count;
 			}
@@ -222,15 +222,15 @@ long lan_server::recv_post(session* s) noexcept
 	return wb[0].len;
 }
 
-void lan_server::send_post(session* s) noexcept
+long lan_server::send_post(session* s) noexcept
 {
 	int use_size = s->_send_buffer.use_size();
 
-	if (use_size <= 0) return;
+	if (use_size <= 0) return -1;
 
 	char prev_io_send = InterlockedExchange8(&s->_io_send, 1);
 
-	if (prev_io_send) return;
+	if (prev_io_send) return -1;
 
 	WSABUF wb[2];
 
@@ -239,7 +239,7 @@ void lan_server::send_post(session* s) noexcept
 	if (wb[0].len <= 0)
 	{
 		InterlockedExchange8(&s->_io_send, 0);
-		return;
+		return -1;
 	}
 
 	InterlockedIncrement(&s->_io_count);
@@ -258,16 +258,26 @@ void lan_server::send_post(session* s) noexcept
 
 			if (error == WSAECONNABORTED || error == WSAECONNRESET)
 			{
-				InterlockedDecrement(&s->_io_count);
 				InterlockedExchange8(&s->_io_send, 0);
+				long io_count = InterlockedDecrement(&s->_io_count);
 
-				return;
+				return io_count;
 			}
 			else __debugbreak();
 		}
 
 		//wprintf(L"[WSASend] PENDING %d (io %d)\n", error, s->_io_count);
 	}
+
+	return wb[0].len;
+}
+
+void lan_server::delete_session(session* s) noexcept
+{
+	SOCKET temp = s->_socket;
+	s->_socket = INVALID_SOCKET;
+	closesocket(s->_socket);
+	--(_session_count);
 }
 
 unsigned __stdcall lan_server::accept_worker(void* args) noexcept
@@ -300,7 +310,7 @@ unsigned __stdcall lan_server::accept_worker(void* args) noexcept
 
 		for (index = 0; index < session_max; ++index)
 		{
-			if (sessions[index]._key._all == -1)
+			if (sessions[index]._socket == INVALID_SOCKET)
 			{
 				current = &(sessions[index]);
 				break;
@@ -341,9 +351,10 @@ unsigned __stdcall lan_server::accept_worker(void* args) noexcept
 		++session_id;
 		++(_this->_session_count);
 
+		// recv
 		long recv_ret = _this->recv_post(current);
 
-		if (recv_ret == 0); // todo
+		if (recv_ret == 0) _this->delete_session(current);
 	}
 
 	wprintf(L"[return] accept %d\n", GetCurrentThreadId());
@@ -419,7 +430,7 @@ unsigned __stdcall lan_server::iocp_worker(void* args) noexcept
 #pragma warning(suppress:6011)
 		int io_count = InterlockedDecrement(&s->_io_count);
 
-		if (io_count == 0); // todo
+		if (io_count == 0) _this->delete_session(s);
 	}
 
 	wprintf(L"[return] iocp %d\n", thread_id);

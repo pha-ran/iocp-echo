@@ -30,7 +30,8 @@ public:
 
 private:
 	long recv_post(session* s) noexcept;
-	void send_post(session* s) noexcept;
+	long send_post(session* s) noexcept;
+	void delete_session(session* s) noexcept;
 
 private:
 	static unsigned __stdcall accept_worker(void* args) noexcept;

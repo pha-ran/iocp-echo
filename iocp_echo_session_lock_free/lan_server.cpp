@@ -224,22 +224,23 @@ void lan_server::recv_post(session* s) noexcept
 
 void lan_server::send_post(session* s) noexcept
 {
-	int use_size = s->_send_buffer.use_size();
-
-	if (use_size <= 0) return;
-
-	char prev_io_send = InterlockedExchange8(&s->_io_send, 1);
-
-	if (prev_io_send) return;
-
 	WSABUF wb[2];
+	int count;
 
-	int count = s->_send_buffer.set_wsabuf_send(wb);
-
-	if (wb[0].len <= 0)
+	for (;;)
 	{
-		InterlockedExchange8(&s->_io_send, 0);
-		return;
+		int use_size = s->_send_buffer.use_size();
+
+		if (use_size <= 0) return;
+
+		char prev_io_send = InterlockedExchange8(&s->_io_send, 1);
+
+		if (prev_io_send) return;
+
+		count = s->_send_buffer.set_wsabuf_send(wb);
+
+		if (wb[0].len <= 0) InterlockedExchange8(&s->_io_send, 0);
+		else				break;
 	}
 
 	InterlockedIncrement(&s->_io_count);
@@ -274,8 +275,8 @@ void lan_server::delete_session(session* s) noexcept
 {
 	SOCKET temp = s->_socket;
 	s->_socket = INVALID_SOCKET;
-	closesocket(s->_socket);
-	--(_session_count);
+	closesocket(temp);
+	--_session_count;
 }
 
 unsigned __stdcall lan_server::accept_worker(void* args) noexcept

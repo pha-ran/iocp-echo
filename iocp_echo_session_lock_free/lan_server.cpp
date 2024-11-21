@@ -324,7 +324,7 @@ unsigned __stdcall lan_server::accept_worker(void* args) noexcept
 		current->_key._id = session_id;
 		current->_key._index = index;
 
-		current->_io_count = 0;
+		current->_io_count = 1;
 		current->_io_send = 0;
 
 		PCWSTR ntop = InetNtopW(AF_INET, &client_addr.sin_addr, current->_ip, _countof(current->_ip));
@@ -351,10 +351,25 @@ unsigned __stdcall lan_server::accept_worker(void* args) noexcept
 		++session_id;
 		++(_this->_session_count);
 
-		// recv
-		long recv_ret = _this->recv_post(current);
+		// login
+		unsigned long long payload = 0x7fffffffffffffff;
+		unsigned short header = sizeof(payload);
 
-		if (recv_ret == 0) _this->delete_session(current);
+		int header_ret = current->_send_buffer.enqueue((char*)&header, sizeof(header));
+		if (header_ret <= 0) __debugbreak();
+		int payload_ret = current->_send_buffer.enqueue((char*)&payload, sizeof(payload));
+		if (payload_ret <= 0) __debugbreak();
+		
+		// send
+		long send_ret = _this->send_post(current);
+
+		// recv
+		if (send_ret != 0) _this->recv_post(current);
+
+		// io count
+		long io_count = InterlockedDecrement(&current->_io_count);
+
+		if (io_count == 0) _this->delete_session(current);
 	}
 
 	wprintf(L"[return] accept %d\n", GetCurrentThreadId());

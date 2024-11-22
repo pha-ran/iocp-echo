@@ -1,5 +1,6 @@
 #pragma once
 
+#include "serialization_buffer.h"
 #include "session.h"
 
 class lan_server

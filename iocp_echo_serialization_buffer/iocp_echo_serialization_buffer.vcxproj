@@ -19,10 +19,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="lan_server.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ring_buffer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="lan_server.h" />
     <ClInclude Include="ring_buffer.h" />
     <ClInclude Include="session.h" />
   </ItemGroup>

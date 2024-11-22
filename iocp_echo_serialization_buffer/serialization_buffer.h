@@ -4,13 +4,17 @@
 
 class serialization_buffer final
 {
+	friend class lan_server;
+
+	using header = unsigned short;
+
 public:
 	static constexpr int _capacity = 1024;
 
 public:
 #pragma warning(suppress:26495)
 	inline serialization_buffer(void) noexcept
-		: _front(0), _back(0), _fail(false) {}
+		: _front(sizeof(header)), _back(sizeof(header)), _fail(false) {}
 
 public:
 	inline void clear(void) noexcept
@@ -86,6 +90,12 @@ private:
 		}
 
 		_front += size;
+	}
+
+	inline void set_header(void) noexcept
+	{
+		*((header*)_buffer) = size();
+		_front = 0;
 	}
 
 public:

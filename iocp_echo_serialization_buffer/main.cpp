@@ -1,4 +1,5 @@
 #include "lan_server.h"
+#include "serialization_buffer.h"
 #include <conio.h>
 
 #ifdef _DEBUG
@@ -11,7 +12,11 @@ class echo : public lan_server
 {
 	void on_receive(unsigned long long key, unsigned long long payload) noexcept override
 	{
-		send_message(key, payload);
+		serialization_buffer* sb = new serialization_buffer;
+
+		*sb << payload;
+
+		send_message(key, sb);
 	}
 };
 

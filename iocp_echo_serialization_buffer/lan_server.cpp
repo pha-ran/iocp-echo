@@ -167,21 +167,17 @@ void lan_server::stop(void) noexcept
 	delete[] _sessions;
 }
 
-bool lan_server::send_message(unsigned long long key, unsigned long long payload) noexcept
+bool lan_server::send_message(unsigned long long key, serialization_buffer* message) noexcept
 {
 	session* s = &_sessions[((session::key*)&key)->_index];
 
 	// todo
 
-	unsigned short header = sizeof(payload);
+	message->set_header();
 
-	int header_ret = s->_send_buffer.enqueue((char*)&header, sizeof(header));
+	int message_ret = s->_send_buffer.enqueue((const char*)&message, sizeof(serialization_buffer*));
 
-	if (header_ret <= 0) __debugbreak();
-
-	int payload_ret = s->_send_buffer.enqueue((char*)&payload, sizeof(payload));
-
-	if (payload_ret <= 0) __debugbreak();
+	if (message_ret <= 0) __debugbreak();
 
 	send_post(s);
 
@@ -351,13 +347,15 @@ unsigned __stdcall lan_server::accept_worker(void* args) noexcept
 		++(_this->_session_count);
 
 		// login
-		unsigned long long payload = 0x7fffffffffffffff;
-		unsigned short header = sizeof(payload);
+		serialization_buffer* sb = new serialization_buffer;
 
-		int header_ret = current->_send_buffer.enqueue((char*)&header, sizeof(header));
-		if (header_ret <= 0) __debugbreak();
-		int payload_ret = current->_send_buffer.enqueue((char*)&payload, sizeof(payload));
-		if (payload_ret <= 0) __debugbreak();
+		*sb << (unsigned long long)0x7fffffffffffffff;
+
+		sb->set_header();
+
+		int message_ret = current->_send_buffer.enqueue((const char*)&sb, sizeof(serialization_buffer*));
+
+		if (message_ret <= 0) __debugbreak();
 
 		// send
 		_this->send_post(current);

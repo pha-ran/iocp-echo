@@ -24,7 +24,7 @@ public:
 	}
 
 public:
-	bool send_message(unsigned long long key, unsigned long long payload) noexcept;
+	bool send_message(unsigned long long key, serialization_buffer* message) noexcept;
 
 public:
 	virtual void on_receive(unsigned long long key, unsigned long long payload) noexcept = 0;
